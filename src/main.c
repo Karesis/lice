@@ -235,7 +235,7 @@ AppRes run_logic(allocer_t sys, const struct LiceConfig *cfg)
 
 static bool apply_license_to_file(const char *filepath, str_t golden_header)
 {
-	allocer_t sys = allocer_system();
+	auto sys = allocer_system();
 	defer(string_deinit) string_t content;
 
 	if (!string_init(&content, sys, 0))
@@ -245,7 +245,7 @@ static bool apply_license_to_file(const char *filepath, str_t golden_header)
 		return false;
 	}
 
-	str_t content_slice = string_as_str(&content);
+	auto content_slice = string_as_str(&content);
 
 	/// 2. check if Header already exists
 	if (str_starts_with(content_slice, golden_header)) {
@@ -295,8 +295,8 @@ static bool apply_license_to_file(const char *filepath, str_t golden_header)
 static bool license_walk_cb(const char *path, dir_entry_type_t type,
 			    void *userdata)
 {
-	struct WalkCtx *ctx = (struct WalkCtx *)userdata;
-	str_t path_slice = str_from_cstr(path);
+	auto ctx = (struct WalkCtx *)userdata;
+	auto path_slice = str_from_cstr(path);
 
 	/// 1. check Exclude
 	/// iterate over cfg->excludes list
@@ -317,7 +317,7 @@ static bool license_walk_cb(const char *path, dir_entry_type_t type,
 		return true;
 
 	/// 3. check extension (.c / .h)
-	str_t ext = path_ext(path_slice);
+	auto ext = path_ext(path_slice);
 	if (!str_eq_cstr(ext, "c") && !str_eq_cstr(ext, "h")) {
 		return true;
 	}
@@ -374,27 +374,27 @@ static void format_license_as_comment(string_t *out, str_t raw_license)
  */
 static bool is_path_excluded(str_t path, str_t pattern)
 {
-	usize start_idx = 0;
+	auto start_idx = usize_(0);
 
 	while (true) {
 		/// search in the remaining part
-		str_t remaining = str_from_parts(path.ptr + start_idx,
-						 path.len - start_idx);
-		usize found_idx = str_find(remaining, pattern);
+		auto remaining = str_from_parts(path.ptr + start_idx,
+						path.len - start_idx);
+		auto found_idx = str_find(remaining, pattern);
 
 		if (found_idx == (usize)-1)
 			break;
 
 		/// convert to absolute index
-		usize abs_idx = start_idx + found_idx;
+		auto abs_idx = start_idx + found_idx;
 
 		/// 1. check left boundary
-		bool left_ok = (abs_idx == 0) ||
+		auto left_ok = (abs_idx == 0) ||
 			       IS_PATH_SEP(path.ptr[abs_idx - 1]);
 
 		/// 2. check right boundary
-		usize end_idx = abs_idx + pattern.len;
-		bool right_ok = (end_idx == path.len) ||
+		auto end_idx = abs_idx + pattern.len;
+		auto right_ok = (end_idx == path.len) ||
 				IS_PATH_SEP(path.ptr[end_idx]);
 
 		if (left_ok && right_ok)
