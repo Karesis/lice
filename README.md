@@ -17,7 +17,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone [https://github.com/Karesis/lice.git](https://github.com/Karesis/lice.git)
+git clone https://github.com/Karesis/lice.git
 cd lice
 
 # 2. Initialize dependencies (fluf)
