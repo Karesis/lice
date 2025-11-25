@@ -1,6 +1,17 @@
-# lice
+<p align="center">
+  <img src="assets/logo.png" alt="Lice Logo" width="200">
+</p>
 
-**A lightweight, ultra-fast CLI tool to automate license headers.**
+<h1 align="center">lice</h1>
+
+<p align="center">
+  <strong>A lightweight, ultra-fast CLI tool to automate license headers.</strong>
+</p>
+
+<p align="center">
+  </p>
+
+---
 
 `lice` recursively scans your project and applies (or updates) license headers to source files. It is built with [**fluf**](https://github.com/Karesis/fluf), showcasing the power of a modern, opinionated C toolkit.
 
