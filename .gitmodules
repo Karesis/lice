@@ -1,3 +1,0 @@
-[submodule "vendor/fluf"]
-	path = vendor/fluf
-	url = git@github.com:Karesis/fluf.git
