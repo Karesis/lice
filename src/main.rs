@@ -4,25 +4,25 @@ use std::{fs, io, process};
 // ============================================================================
 // 1. Configuration
 // ============================================================================
-const USAGE_INFO: &'static str = r#"
-lice - Automate source code license headers
+const USAGE_INFO: &'static str = 
+r#"lice - Automate source code license headers
     
-Usage:
-    lice [options] [paths...]
+USAGE:
+    lice [OPTIONS] [PATHS...]
 
-Arguments:
-    [paths]                  Directories or files to process.
-                                If omitted, the current directory is used.
+ARGUMENTS:
+    [PATHS...]               Directories or files to process.
+                             If omitted, the current directory is used (.).
 
-Options:
-    -f, --file <path>        Path to the license header file (Required).
-    -e, --exclude <pattern>  Exclude file/directory matching this pattern.
-                                Can be specified multiple times.
-    -h, --help               Show this help message.
+OPTIONS:
+    -f, --file <PATH>        Path to the license header file. (Required)
+    -e, --exclude <PATTERN>  Exclude file/directory matching this pattern.
+                             Can be specified multiple times.
+    -h, --help               Show this help message and exit.
 
-Examples:
+EXAMPLES:
     # Apply license to the current directory
-    lice -f HEADER.txt
+    lice -f HEADER.txt .
 
     # Apply to 'src' and 'include', excluding 'vendor' and 'build'
     lice -f HEADER.txt -e vendor -e build src include
@@ -36,7 +36,16 @@ struct Config {
 
 impl Config {
     fn from_env() -> Result<Self, String> {
-        let mut args = std::env::args().skip(1);
+        let raw_args: Vec<String> = std::env::args().skip(1).collect();
+        
+        // check if args is empty
+        if raw_args.is_empty() {
+            eprintln!("{}", USAGE_INFO);
+            process::exit(0);
+        }
+
+        let mut args = raw_args.into_iter();
+
         let mut config = Config {
             license_file: None,
             excludes: Vec::new(),
