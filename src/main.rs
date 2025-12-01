@@ -1,28 +1,26 @@
 //    Copyright 2025 Karesis
-// 
+//
 //    Licensed under the Apache License, Version 2.0 (the "License");
 //    you may not use this file except in compliance with the License.
 //    You may obtain a copy of the License at
-// 
+//
 //        http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 //    Unless required by applicable law or agreed to in writing, software
 //    distributed under the License is distributed on an "AS IS" BASIS,
 //    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-
 use std::path::{Path, PathBuf};
-use std::{fs, io, process};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
+use std::{fs, io, process};
 
 // ============================================================================
 // 1. Configuration
 // ============================================================================
-const USAGE_INFO: &'static str = 
-r#"lice - Automate source code license headers
+const USAGE_INFO: &'static str = r#"lice - Automate source code license headers
     
 USAGE:
   lice [OPTIONS] [PATHS...]
@@ -54,7 +52,7 @@ struct Config {
 impl Config {
     fn from_env() -> Result<Self, String> {
         let raw_args: Vec<String> = std::env::args().skip(1).collect();
-        
+
         // check if args is empty
         if raw_args.is_empty() {
             eprintln!("{}", USAGE_INFO);
@@ -113,22 +111,38 @@ impl Config {
 struct LanguageProfile {
     /// comment start
     /// e.g., "/*" or "" (line comment)
-    start: &'static str,   
+    start: &'static str,
 
     /// comment prefix
     /// e.g., " * " or "// "
-    prefix: &'static str,  
+    prefix: &'static str,
 
     /// comment end
     /// e.g., " */" or ""
-    end: &'static str,    
+    end: &'static str,
 }
 
 /// comment styles
-const STYLE_C_LIKE: LanguageProfile = LanguageProfile { start: "/*\n", prefix: " * ", end: " */\n\n" };
-const STYLE_HASH: LanguageProfile   = LanguageProfile { start: "", prefix: "# ", end: "\n" }; // Python, Shell, Ruby
-const STYLE_DOUBLE_SLASH: LanguageProfile = LanguageProfile { start: "", prefix: "// ", end: "\n" }; // Rust, Go, Java (line mode)
-const STYLE_DASH: LanguageProfile   = LanguageProfile { start: "", prefix: "-- ", end: "\n" }; // Lua, Haskell, SQL
+const STYLE_C_LIKE: LanguageProfile = LanguageProfile {
+    start: "/*\n",
+    prefix: " * ",
+    end: " */\n\n",
+};
+const STYLE_HASH: LanguageProfile = LanguageProfile {
+    start: "",
+    prefix: "# ",
+    end: "\n",
+}; // Python, Shell, Ruby
+const STYLE_DOUBLE_SLASH: LanguageProfile = LanguageProfile {
+    start: "",
+    prefix: "// ",
+    end: "\n",
+}; // Rust, Go, Java (line mode)
+const STYLE_DASH: LanguageProfile = LanguageProfile {
+    start: "",
+    prefix: "-- ",
+    end: "\n",
+}; // Lua, Haskell, SQL
 
 fn get_language_style(ext: &str) -> Option<LanguageProfile> {
     match ext {
@@ -154,7 +168,7 @@ impl LiceEngine {
     fn new(config: Config) -> Result<Self, io::Error> {
         let path = config.license_file.as_ref().unwrap(); // validate ensured 
         let raw = fs::read_to_string(path)?;
-        
+
         Ok(Self {
             config,
             raw_license_text: raw,
@@ -164,7 +178,9 @@ impl LiceEngine {
     /// entry
     fn run(self) -> io::Result<()> {
         let num_threads = self.config.jobs.unwrap_or_else(|| {
-            thread::available_parallelism().map(|n| n.get()).unwrap_or(4)
+            thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4)
         });
 
         // ============================
@@ -181,7 +197,7 @@ impl LiceEngine {
         // ============================
         // Mode B: Multi-thread
         // ============================
-        let shared_engine = Arc::new(self); 
+        let shared_engine = Arc::new(self);
         let (tx, rx) = mpsc::channel::<PathBuf>();
         let shared_rx = Arc::new(Mutex::new(rx));
 
@@ -211,22 +227,26 @@ impl LiceEngine {
                 eprintln!("Failed to send task: {}", e);
             }
         });
-        
-        drop(tx); 
 
-        for h in handles { h.join().unwrap(); }
+        drop(tx);
+
+        for h in handles {
+            h.join().unwrap();
+        }
         Ok(())
     }
 
     // Helper: accepts a closure
-    fn traverse<F>(&self, mut callback: F) 
-    where 
-        F: FnMut(PathBuf) // this closure accepts a PathBuf and ret ()
+    fn traverse<F>(&self, mut callback: F)
+    where
+        F: FnMut(PathBuf), // this closure accepts a PathBuf and ret ()
     {
         let mut stack = self.config.targets.to_vec();
 
         while let Some(path) = stack.pop() {
-            if self.is_excluded(&path) { continue; }
+            if self.is_excluded(&path) {
+                continue;
+            }
 
             if path.is_dir() {
                 match fs::read_dir(&path) {
@@ -256,7 +276,7 @@ impl LiceEngine {
                 if let Err(e) = self.apply_license(path, style) {
                     eprintln!("Error processing {:?}: {}", path, e);
                 }
-            },
+            }
             None => {
                 eprintln!("[WARN] Ignoring unsupported file type: {:?}", path)
             }
@@ -283,29 +303,27 @@ impl LiceEngine {
             println!(" License OK: {:?}", path);
             return Ok(());
         }
-        
-        let new_content = if !style.start.is_empty() {
 
+        let new_content = if !style.start.is_empty() {
             // block comments
             if content.trim_start().starts_with(style.start) {
                 if let Some(end_idx) = content.find(style.end) {
                     let body = &content[end_idx + style.end.len()..];
                     format!("{}{}", header, body.trim_start())
                 } else {
-
                     // malformed file
-                    eprintln!("[WARN] Skipping {:?}: Unclosed block comment detected.", path);
+                    eprintln!(
+                        "[WARN] Skipping {:?}: Unclosed block comment detected.",
+                        path
+                    );
                     return Ok(()); // continue
                 }
             } else {
-                // 没有以块注释开头 -> 直接附加
                 format!("{}{}", header, content)
             }
-
         } else {
             // line comments
             self.replace_line_comment_header(&content, &header, style)
-
         };
 
         fs::write(path, new_content)?;
@@ -313,7 +331,12 @@ impl LiceEngine {
     }
 
     /// handle line comment header replacement
-    fn replace_line_comment_header(&self, content: &str, header: &str, style: LanguageProfile) -> String {
+    fn replace_line_comment_header(
+        &self,
+        content: &str,
+        header: &str,
+        style: LanguageProfile,
+    ) -> String {
         let lines: Vec<&str> = content.lines().collect();
         let mut keep_start_idx = 0;
         let mut shebang_line = None;
@@ -322,7 +345,7 @@ impl LiceEngine {
         if let Some(first_line) = lines.first() {
             if first_line.starts_with("#!") {
                 shebang_line = Some(*first_line);
-                keep_start_idx = 1; // 跳过第一行，从第二行开始检查 License
+                keep_start_idx = 1; 
             }
         }
 
@@ -335,25 +358,25 @@ impl LiceEngine {
                 keep_start_idx += 1;
             } else if trimmed.is_empty() {
                 keep_start_idx += 1;
-                break; 
+                break;
             } else {
                 // reach the code
                 break;
             }
         }
 
-        let body = lines[keep_start_idx..].join("\n"); 
-        
+        let body = lines[keep_start_idx..].join("\n");
+
         let mut out = String::new();
-        
+
         if let Some(sb) = shebang_line {
             out.push_str(sb);
             out.push('\n');
         }
-        
+
         out.push_str(header);
         out.push_str(&body);
-        
+
         // add \n to eof
         if !out.ends_with('\n') {
             out.push('\n');
@@ -368,7 +391,7 @@ impl LiceEngine {
         if !style.start.is_empty() {
             out.push_str(style.start);
         }
-        
+
         for line in raw.lines() {
             let trimmed = line.trim_end();
             out.push_str(style.prefix);
@@ -380,7 +403,7 @@ impl LiceEngine {
             out.push_str(style.end);
         } else {
             // line comment just add \n
-            out.push('\n'); 
+            out.push('\n');
         }
         out
     }
@@ -391,7 +414,9 @@ impl LiceEngine {
             match component.as_os_str().to_str() {
                 Some(s) => {
                     for pattern in &self.config.excludes {
-                        if s == pattern { return true; }
+                        if s == pattern {
+                            return true;
+                        }
                     }
                 }
                 None => {
