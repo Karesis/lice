@@ -86,7 +86,7 @@ impl Config {
                 }
                 "-j" | "--jobs" => {
                     let val = args.next().ok_or("-j requires an argument")?;
-                    // 解析字符串为数字
+                    // parse str to usize
                     let num = val.parse::<usize>().map_err(|_| "Invalid number for -j")?;
                     config.jobs = Some(num);
                 }
@@ -111,12 +111,20 @@ impl Config {
 
 #[derive(Debug, Clone, Copy)]
 struct LanguageProfile {
-    start: &'static str,   // 块注释开始，例如 "/*" 或 "" (如果是行注释)
-    prefix: &'static str,  // 每一行的前缀，例如 " * " 或 "// "
-    end: &'static str,     // 块注释结束，例如 " */" 或 ""
+    /// comment start
+    /// e.g., "/*" or "" (line comment)
+    start: &'static str,   
+
+    /// comment prefix
+    /// e.g., " * " or "// "
+    prefix: &'static str,  
+
+    /// comment end
+    /// e.g., " */" or ""
+    end: &'static str,    
 }
 
-// 预定义几种常见风格
+/// comment styles
 const STYLE_C_LIKE: LanguageProfile = LanguageProfile { start: "/*\n", prefix: " * ", end: " */\n\n" };
 const STYLE_HASH: LanguageProfile   = LanguageProfile { start: "", prefix: "# ", end: "\n" }; // Python, Shell, Ruby
 const STYLE_DOUBLE_SLASH: LanguageProfile = LanguageProfile { start: "", prefix: "// ", end: "\n" }; // Rust, Go, Java (line mode)
@@ -160,11 +168,10 @@ impl LiceEngine {
         });
 
         // ============================
-        // 模式 A: 单线程 (直接干活)
+        // Mode A: Single-thread
         // ============================
         if num_threads == 1 {
             println!("Running in single-threaded mode.");
-            // 直接调用 traverse，传入一个闭包让它去 process_file
             self.traverse(|path| {
                 self.process_file(&path);
             });
@@ -172,9 +179,9 @@ impl LiceEngine {
         }
 
         // ============================
-        // 模式 B: 多线程 (生产者-消费者)
+        // Mode B: Multi-thread
         // ============================
-        let shared_engine = Arc::new(self); // 这里的 self 被移动进了 Arc
+        let shared_engine = Arc::new(self); 
         let (tx, rx) = mpsc::channel::<PathBuf>();
         let shared_rx = Arc::new(Mutex::new(rx));
 
@@ -187,37 +194,34 @@ impl LiceEngine {
 
             handles.push(thread::spawn(move || {
                 loop {
-                    // 取任务
+                    // get the job
                     let path = match thread_rx.lock().unwrap().recv() {
                         Ok(p) => p,
-                        Err(_) => break, // 通道关闭，退出
+                        Err(_) => break, // exit
                     };
-                    // 干活
+                    // process
                     thread_engine.process_file(&path);
                 }
             }));
         }
 
-        // 主线程：只负责遍历和分发
-        // 注意：这里我们调用 shared_engine.traverse
+        // main thread
         shared_engine.traverse(|path| {
-            // 回调函数：把路径通过 channel 发送出去
             if let Err(e) = tx.send(path) {
                 eprintln!("Failed to send task: {}", e);
             }
         });
         
-        // 记得销毁发送端
         drop(tx); 
 
         for h in handles { h.join().unwrap(); }
         Ok(())
     }
 
-    // 这是一个高阶函数，accepts a closure
+    // Helper: accepts a closure
     fn traverse<F>(&self, mut callback: F) 
     where 
-        F: FnMut(PathBuf) // 这个闭包接受一个 PathBuf，不返回任何值
+        F: FnMut(PathBuf) // this closure accepts a PathBuf and ret ()
     {
         let mut stack = self.config.targets.to_vec();
 
@@ -234,9 +238,6 @@ impl LiceEngine {
                     Err(e) => eprintln!("Failed to read dir {:?}: {}", path, e),
                 }
             } else {
-                // *** 核心改变 ***
-                // 以前是 tx.send(path) 或者 self.process_file(path)
-                // 现在我们不知道要做什么，直接调用传入的回调函数
                 callback(path);
             }
         }
@@ -244,16 +245,14 @@ impl LiceEngine {
 
     /// Iterative DFS
     fn process_file(&self, path: &PathBuf) {
-        // 先做扩展名检查
+        // check ext
         let ext = match path.extension().and_then(|s| s.to_str()) {
             Some(e) => e,
-            None => return, // 没有扩展名，直接忽略
+            None => return, // no ext, ignore
         };
 
-        // 获取风格配置
         match get_language_style(ext) {
             Some(style) => {
-                // 执行具体的 IO 操作
                 if let Err(e) = self.apply_license(path, style) {
                     eprintln!("Error processing {:?}: {}", path, e);
                 }
@@ -268,24 +267,18 @@ impl LiceEngine {
     fn apply_license(&self, path: &Path, style: LanguageProfile) -> io::Result<()> {
         let content = fs::read_to_string(path)?;
 
-        // 1. generate header
+        // generate header
         let header = self.make_header_for_style(&self.raw_license_text, style);
 
-        // 2. check if exists
-        // 1. 计算我们要检查的“起始位置”
-        // 如果有 Shebang，我们就跳过第一行，从第二行开始看
+        // handle with shebang
         let offset = if content.starts_with("#!") {
-            // 找到第一行结束的位置（换行符的位置 + 1）
             content.find('\n').map(|i| i + 1).unwrap_or(0)
         } else {
             0
         };
-
-        // 2. 取出“正文视口” (View)
         let body_to_check = &content[offset..];
 
-        // 3. 检查：去掉开头的空白后，是否是以我们的 Header 开头？
-        // trim_start() 很重要，防止 Header 前面有几个不必要的空行导致匹配失败
+        // check if exists
         if body_to_check.trim_start().starts_with(header.trim()) {
             println!(" License OK: {:?}", path);
             return Ok(());
@@ -299,11 +292,13 @@ impl LiceEngine {
                     let body = &content[end_idx + style.end.len()..];
                     format!("{}{}", header, body.trim_start())
                 } else {
-                    // 块注释没闭合，直接追加在最前
-                    format!("{}{}", header, content)
-                    // 要是没有闭合，不应该是删除然后再附加?还是报错？还是什么？
+
+                    // malformed file
+                    eprintln!("[WARN] Skipping {:?}: Unclosed block comment detected.", path);
+                    return Ok(()); // continue
                 }
             } else {
+                // 没有以块注释开头 -> 直接附加
                 format!("{}{}", header, content)
             }
 
@@ -323,7 +318,7 @@ impl LiceEngine {
         let mut keep_start_idx = 0;
         let mut shebang_line = None;
 
-        // 1. 检查 Shebang (针对 # 风格)
+        // check shebang
         if let Some(first_line) = lines.first() {
             if first_line.starts_with("#!") {
                 shebang_line = Some(*first_line);
@@ -331,36 +326,26 @@ impl LiceEngine {
             }
         }
 
-        // 2. 向下扫描，跳过所有被认为是“旧 Header”的行
-        // 定义：连续的、以 prefix 开头的行
+        // scan for "old"
         while keep_start_idx < lines.len() {
             let line = lines[keep_start_idx];
             let trimmed = line.trim();
 
             if trimmed.starts_with(style.prefix.trim()) {
-                // 这是一个注释行，认为是旧 Header 的一部分 -> 跳过
                 keep_start_idx += 1;
             } else if trimmed.is_empty() {
-                // 这是一个空行。
-                // 策略：通常 License 和代码之间会有空行。
-                // 如果我们剥离了 License，最好也把紧接着的一个空行剥离掉，
-                // 因为 new_header 里通常自带了结尾的空行。
                 keep_start_idx += 1;
-                // 遇到空行后，通常意味着 Header 结束了，停止扫描
-                // 避免误删下面的代码块注释
                 break; 
             } else {
-                // 遇到了代码（既不是注释前缀，也不是空行） -> 停止
+                // reach the code
                 break;
             }
         }
 
-        // 3. 组装新内容
-        let body = lines[keep_start_idx..].join("\n"); // 重新拼接剩余部分
+        let body = lines[keep_start_idx..].join("\n"); 
         
         let mut out = String::new();
         
-        // 如果有 Shebang，先放回去
         if let Some(sb) = shebang_line {
             out.push_str(sb);
             out.push('\n');
@@ -369,7 +354,7 @@ impl LiceEngine {
         out.push_str(header);
         out.push_str(&body);
         
-        // 保持文件末尾有换行符是好习惯
+        // add \n to eof
         if !out.ends_with('\n') {
             out.push('\n');
         }
@@ -394,7 +379,7 @@ impl LiceEngine {
         if !style.end.is_empty() {
             out.push_str(style.end);
         } else {
-            // 对于行注释风格（如 Python），通常 Header 结束后加个空行
+            // line comment just add \n
             out.push('\n'); 
         }
         out
