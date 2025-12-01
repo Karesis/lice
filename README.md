@@ -9,7 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Karesis/lice/actions"><img src="https://img.shields.io/github/actions/workflow/status/Karesis/lice/rust.yml?branch=main" alt="Build Status"></a>
   <img src="https://img.shields.io/badge/language-Rust-orange.svg" alt="Language">
   <img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License">
 </p>
