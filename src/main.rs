@@ -345,7 +345,7 @@ impl LiceEngine {
         if let Some(first_line) = lines.first() {
             if first_line.starts_with("#!") {
                 shebang_line = Some(*first_line);
-                keep_start_idx = 1; 
+                keep_start_idx = 1;
             }
         }
 
