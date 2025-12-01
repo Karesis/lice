@@ -5,67 +5,69 @@
 <h1 align="center">lice</h1>
 
 <p align="center">
-  <strong>A lightweight, ultra-fast CLI tool to automate license headers.</strong>
+  <strong>A lightweight, blazing fast CLI tool to automate license headers.</strong>
 </p>
 
 <p align="center">
-  </p>
+  <a href="https://github.com/Karesis/lice/actions"><img src="https://img.shields.io/github/actions/workflow/status/Karesis/lice/rust.yml?branch=main" alt="Build Status"></a>
+  <img src="https://img.shields.io/badge/language-Rust-orange.svg" alt="Language">
+  <img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License">
+</p>
 
 ---
 
-`lice` recursively scans your project and applies (or updates) license headers to source files. It is built with [**fluf**](https://github.com/Karesis/fluf), showcasing the power of a modern, opinionated C toolkit.
+`lice` recursively scans your project and applies (or updates) license headers to source files. 
+
+Originally written in C, **lice** has been rewritten in **Rust** to provide memory safety, safe concurrency, and multi-language support out of the box.
 
 ## 🚀 Features
 
-* **Automated**: Recursively walks directories and applies headers to `.c` and `.h` files.
-* **Smart Updates**: Detects existing headers. If a file already has a license block, `lice` updates it instead of duplicating it.
-* **Exclusions**: Supports ignoring specific files or directories (e.g., `vendor`, `build`) via `-e`.
-* **Zero Dependency**: Statically linked, single-binary distribution. No Python/Node.js runtime required.
+* **Multi-Language Support**: Automatically detects and applies comment styles for:
+    * C/C++ (`.c`, `.h`, `.cpp`, `.hpp`)
+    * Rust (`.rs`)
+    * Python/Shell (`.py`, `.sh`, `.rb`, `.yaml`, `.toml`)
+    * Haskell/Lua/SQL (`.hs`, `.lua`, `.sql`)
+* **Parallel Processing**: Built-in multi-threading (Producer-Consumer model) to handle large codebases instantly.
+* **Smart Updates**: Detects existing headers (including Shebangs `#!`). If a file already has a license block, `lice` updates it gracefully.
+* **Zero Dependency**: Built using **only the Rust Standard Library (`std`)**. No external crates, no bloat.
+* **Exclusions**: Supports ignoring specific files or directories (e.g., `vendor`, `target`) via `-e`.
 
 ## 📦 Installation
 
 ### From Source
+
+Ensure you have Rust installed (via `rustup`).
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/Karesis/lice.git
 cd lice
 
-# 2. Initialize dependencies (fluf)
-make update
+# 2. Build via Cargo
+cargo build --release
 
-# 3. Build
-make
-
-# 4. Install (Optional, requires sudo)
-sudo make install
-````
+# 3. Install (Copy binary to path)
+cp target/release/lice ~/.local/bin/
+# OR using cargo install
+cargo install --path .
+```
 
 ## 📖 Usage
 
 ### Basic Usage
 
-Create a file named `LICENSE_HEADER` containing your desired comment block:
-
-```c
-/*
- * Copyright 2025 MyName
- * Licensed under Apache 2.0
- */
-```
-
-Then run `lice` pointing to that file:
+Create a file named `HEADER` containing your desired license text:
 
 ```bash
-lice -f LICENSE_HEADER
+lice -f HEADER
 ```
 
 ### Advanced Usage
 
-Apply to specific folders (`src`, `include`) while excluding `vendor` and `tests`:
+Apply to specific folders, exclude build artifacts, and use **8 threads** for speed:
 
 ```bash
-lice -f LICENSE_HEADER -e vendor -e tests src include
+lice -f HEADER -e vendor -e target -j 8 src include
 ```
 
 ### Options
@@ -73,18 +75,16 @@ lice -f LICENSE_HEADER -e vendor -e tests src include
 | Option | Description |
 | :--- | :--- |
 | `-f, --file <path>` | **Required.** Path to the file containing the license header text. |
-| `-e, --exclude <pattern>` | Exclude paths matching the pattern (substring match). Can be used multiple times. |
+| `-e, --exclude <pattern>` | Exclude paths matching the pattern. Can be used multiple times. |
+| `-j, --jobs <n>` | Number of worker threads. Default: Auto-detect CPU cores. |
 | `-h, --help` | Show help message. |
 
 ## 🛠️ Built With
 
-`lice` is a first-party application demonstrating the capabilities of the **fluf** C23 toolkit:
-
-  * **Memory Safety**: Uses RAII (`defer`) for automatic resource management.
-  * **Error Handling**: Uses `Result` types for robust error propagation.
-  * **Performance**: Zero-copy string parsing and bump-allocated storage.
+  * **Rust**: For performance and safety.
+  * **std::thread & std::sync**: Hand-crafted thread pool using pure standard library primitives.
+  * **std::fs**: Efficient recursive directory traversal.
 
 ## 📄 License
 
 This project is licensed under the **Apache-2.0 License**. See the [LICENSE](./LICENSE) file for details.
-
